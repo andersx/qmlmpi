@@ -1,5 +1,5 @@
 program qml_driver
-
+    use mpi
     implicit none
 
     double precision, allocatable, dimension(:,:) :: Q
@@ -9,16 +9,40 @@ program qml_driver
     integer :: rep_size
     integer :: n_molecules
 
-    double precision, allocatable, dimension(:,:) :: b
+    double precision, allocatable, dimension(:,:) :: local_B
     double precision, allocatable, dimension(:) :: alphas
 
     integer :: m, n, nrhs, lda, ldb, info
-    integer :: na
-    integer :: i, j
+    integer :: na, i, numroc
+    integer :: local_i, local_j, global_i, global_j
 
     integer :: lwork
     double precision, dimension(:), allocatable :: work
-    double precision, dimension(:,:), allocatable :: K 
+    double precision, dimension(:,:), allocatable :: local_K
+
+    ! pblacs data structures
+    integer :: local_K_rows, local_K_cols
+    integer :: local_B_rows, local_B_cols
+    integer :: local_id, num_ranks, ranks_rows, ranks_cols, context
+    integer :: local_rank_col, local_rank_row, block_size
+    integer :: ierr, desca, descb
+    integer, dimension(2) :: dims
+    
+    ! init pblacs and set cartesian grid of MPI ranks
+    call blacs_pinfo(local_id, num_ranks)
+
+    dims = 0
+    call MPI_Dims_create(num_ranks, 2, dims, ierr)
+    ranks_rows = dims(1)
+    ranks_cols = dims(2)
+
+    block_size = 100
+
+    ! create BLACS context
+    call blacs_get(0, 0, context)
+    call blacs_gridinit(context, 'R', ranks_rows, ranks_cols)
+    call blacs_gridinfo(context, ranks_rows, ranks_cols, &
+        local_rank_row, local_rank_col)
 
     ! Read hyperparameters and arrat suzes
     open(unit = 9, file = "parameters.fout", form="formatted")
@@ -50,45 +74,67 @@ program qml_driver
     ! Size of kernel
     na = size(Q, dim=1)
 
-    ! Allocate kernel
-    allocate(K(na,na))
+    ! Allocate kernel and output
+    local_K_rows = numroc(na, block_size, local_rank_row, 0, ranks_rows)
+    local_K_cols = numroc(na, block_size, local_rank_col, 0, ranks_cols)
+    allocate(local_K(local_K_rows, local_K_cols))
+    local_B_rows = numroc(na, block_size, local_rank_row, 0, ranks_rows)
+    local_B_cols = numroc(1, block_size, local_rank_col, 0, ranks_cols)
+    allocate(local_B(local_B_rows, local_B_cols))
 
     ! Calculate Laplacian kernel
-    do i = 1, na
-        do j = 1, na
-            K(j,i) = exp(-sum(abs(Q(j,:) - Q(i,:)))/sigma)
+    do local_i = 1, local_K_rows
+        call l2g(local_i, local_rank_col, na, ranks_cols, &
+                block_size, global_i)
+        do local_j = 1, local_K_cols
+            call l2g(local_j, local_rank_row, na, ranks_rows, &
+                block_size, global_j)
+            local_K(global_j, global_i) = exp(-sum(abs(Q(global_j,:) - Q(global_i,:)))/sigma)
         enddo
     enddo
 
     ! Setup variables for LAPACK
-    m = size(K, dim=1)
-    n = size(K, dim=2)
-    nrhs = 1
-    lda = m
-    ldb = max(m,n)
-    allocate(b(ldb,1))
-    b = 0.0d0
-    b(:m,1) = y(:m)
-    lwork = (min(m,n) + max(m,n)) * 10
-    allocate(work(lwork))
+    call descinit(desca, na, na, block_size, block_size, 0, 0, context, local_K_rows)
+    call descinit(descb, na, 1, block_size, block_size, 0, 0, context, local_K_rows)
 
     ! Solver
-    call dgels("N", m, n, nrhs, K, lda, b, ldb, work, lwork, info)
+    call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work, 0, info)
 
     ! Copy LAPACK output
-    alphas(:n) = b(:n,1)
+    !alphas(:n) = b(:n,1)
    
     ! Save alphas to file
-    open(unit = 9, file = "alphas_mpi.fout", form="formatted")
-        write(9,*) alphas(:)
-    close(9)
+    !open(unit = 9, file = "alphas_mpi.fout", form="formatted")
+    !    write(9,*) alphas(:)
+    !close(9)
    
+    ! Tear down MPI
+    call blacs_exit(0)
+
     ! Clean up 
     deallocate(work)
-    deallocate(b)
+    deallocate(local_B)
     deallocate(Q)
-    deallocate(K)
+    deallocate(local_K)
     deallocate(Y)    
     deallocate(alphas)    
 
 end program qml_driver
+! convert local index to global index in block-cyclic distribution
+
+   subroutine l2g(il,p,n,np,nb,i)
+
+   implicit none
+   integer :: il   ! local array index, input
+   integer :: p    ! processor array index, input
+   integer :: n    ! global array dimension, input
+   integer :: np   ! processor array dimension, input
+   integer :: nb   ! block size, input
+   integer :: i    ! global array index, output
+   integer :: ilm1   
+
+   ilm1 = il-1
+   i    = (((ilm1/nb) * np) + p)*nb + mod(ilm1,nb) + 1
+
+   return
+   end subroutine l2g
