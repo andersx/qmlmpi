@@ -13,3 +13,7 @@ qml_mpi.so: qml_mpi.f90
 driver: driver.f90
 
 	gfortran driver.f90 -o driver $(F90_FLAGS) $(MKL_LINKER_FLAGS)
+
+driver_mpi: driver_mpi.f90
+
+	gfortran driver_mpi.f90 -o driver_mpi $(F90_FLAGS) $(MKL_LINKER_FLAGS)
