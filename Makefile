@@ -16,4 +16,4 @@ driver: driver.f90
 
 driver_mpi: driver_mpi.f90
 
-	gfortran driver_mpi.f90 -o driver_mpi $(F90_FLAGS) $(MKL_LINKER_FLAGS)
+	mpifort driver_mpi.f90 -o driver_mpi -lmkl_scalapack_ilp64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lmkl_blacs_openmpi_ilp64 -lpthread -lm -ldl 
