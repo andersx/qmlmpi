@@ -16,4 +16,4 @@ driver: driver.f90
 
 driver_mpi: driver_mpi.f90
 
-	mpifort driver_mpi.f90 -o driver_mpi -lmkl_scalapack_ilp64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lmkl_blacs_openmpi_ilp64 -lpthread -lm -ldl 
+	mpifort driver_mpi.f90 -o driver_mpi  -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_blacs_openmpi_lp64 -lpthread -lm -ldl  -I${MKLROOT}/include
