@@ -9,7 +9,6 @@ program qml_driver
     integer :: rep_size
     integer :: n_molecules
 
-    double precision, allocatable, dimension(:,:) :: local_B
     double precision, allocatable, dimension(:) :: alphas
 
     integer :: m, n, nrhs, lda, ldb, info
@@ -18,14 +17,15 @@ program qml_driver
 
     integer :: lwork
     double precision, dimension(:), allocatable :: work
-    double precision, dimension(:,:), allocatable :: local_K
+    double precision, dimension(:,:), allocatable :: local_K, local_B
 
     ! pblacs data structures
     integer :: local_K_rows, local_K_cols
     integer :: local_B_rows, local_B_cols
     integer :: local_id, num_ranks, ranks_rows, ranks_cols, context
     integer :: local_rank_col, local_rank_row, block_size
-    integer :: ierr, desca, descb
+    integer :: ierr
+    integer, dimension(9) :: desca, descb
     integer, dimension(2) :: dims
     
     ! init pblacs and set cartesian grid of MPI ranks
@@ -94,8 +94,8 @@ program qml_driver
     enddo
 
     ! Setup variables for LAPACK
-    call descinit(desca, na, na, block_size, block_size, 0, 0, context, local_K_rows)
-    call descinit(descb, na, 1, block_size, block_size, 0, 0, context, local_K_rows)
+    call descinit(desca, na, na, block_size, block_size, 0, 0, context, local_K_rows, info)
+    call descinit(descb, na, 1, block_size, block_size, 0, 0, context, local_B_rows, info)
 
     ! Solver
     call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work, 0, info)
