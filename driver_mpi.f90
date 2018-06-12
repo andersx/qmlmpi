@@ -27,6 +27,7 @@ program qml_driver
     integer :: ierr
     integer, dimension(9) :: desca, descb
     integer, dimension(2) :: dims
+    double precision, dimension(2) :: work_query
     
     ! init pblacs and set cartesian grid of MPI ranks
     call blacs_pinfo(local_id, num_ranks)
@@ -97,16 +98,24 @@ program qml_driver
     call descinit(desca, na, na, block_size, block_size, 0, 0, context, local_K_rows, info)
     call descinit(descb, na, 1, block_size, block_size, 0, 0, context, local_B_rows, info)
 
+    ! Allocate local work arrays
+    call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work_query, -1, info)
+    lwork = work_query(1)
+    allocate(work(lwork))
+
+    local_B = 0.0d0
+    local_B(:m,1) = y(:m)
+
     ! Solver
-    call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work, 0, info)
+    call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work, lwork, info)
 
     ! Copy LAPACK output
-    !alphas(:n) = b(:n,1)
+    alphas(:n) = local_B(:n,1)
    
     ! Save alphas to file
-    !open(unit = 9, file = "alphas_mpi.fout", form="formatted")
-    !    write(9,*) alphas(:)
-    !close(9)
+    open(unit = 9, file = "alphas_mpi.fout", form="formatted")
+        write(9,*) alphas(:)
+    close(9)
    
     ! Tear down MPI
     call blacs_exit(0)
