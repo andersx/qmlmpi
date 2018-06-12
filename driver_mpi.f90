@@ -83,13 +83,13 @@ program qml_driver
     allocate(local_B(local_B_rows, local_B_cols))
 
     ! Calculate Laplacian kernel
-    do local_i = 1, local_K_rows
-        call l2g(local_i, local_rank_col, na, ranks_cols, &
-                block_size, global_i)
-        do local_j = 1, local_K_cols
-            call l2g(local_j, local_rank_row, na, ranks_rows, &
+    do local_j = 1, local_K_cols
+        call l2g(local_j, local_rank_col, na, ranks_cols, &
                 block_size, global_j)
-            local_K(global_j, global_i) = exp(-sum(abs(Q(global_j,:) - Q(global_i,:)))/sigma)
+        do local_i = 1, local_K_rows
+            call l2g(local_i, local_rank_row, na, ranks_rows, &
+                block_size, global_i)
+            local_K(local_i, local_j) = exp(-sum(abs(Q(global_j,:) - Q(global_i,:)))/sigma)
         enddo
     enddo
 
