@@ -105,20 +105,24 @@ program qml_driver
 
     ! copy data
     local_B = 0.0d0
-    do local_i = 1, local_B_rows
-        call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
-        local_B(local_i, 1) = y(global_i)
-    enddo
+    if (local_B_cols .ne. 0) then
+        do local_i = 1, local_B_rows
+            call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
+            local_B(local_i, 1) = y(global_i)
+        enddo
+    end if
 
     ! Solver
     call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work, lwork, info)
 
     ! Copy LAPACK output
     alphas = 0.0d0
-    do local_i = 1, local_B_rows
-        call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
-        alphas(global_i) = local_B(local_i, 1)
-    enddo
+    if (local_B_cols .ne. 0) then
+        do local_i = 1, local_B_rows
+            call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
+            alphas(global_i) = local_B(local_i, 1)
+        enddo
+    endif
     call DGSUM2D(context, "All", "1-tree", na, 1, alphas, 1, -1, -1)
 
     ! Save alphas to file
