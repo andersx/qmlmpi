@@ -11,7 +11,7 @@ program qml_driver
 
     double precision, allocatable, dimension(:) :: alphas
 
-    integer :: m, n, nrhs, lda, ldb, info
+    integer :: info
     integer :: na, i, numroc
     integer :: local_i, local_j, global_i, global_j
 
@@ -85,10 +85,10 @@ program qml_driver
 
     ! Calculate Laplacian kernel
     do local_j = 1, local_K_cols
-        call l2g(local_j, local_rank_col, na, ranks_cols, &
+        call l2g(local_j, local_rank_col, ranks_cols, &
                 block_size, global_j)
         do local_i = 1, local_K_rows
-            call l2g(local_i, local_rank_row, na, ranks_rows, &
+            call l2g(local_i, local_rank_row, ranks_rows, &
                 block_size, global_i)
             local_K(local_i, local_j) = exp(-sum(abs(Q(global_j,:) - Q(global_i,:)))/sigma)
         enddo
@@ -100,13 +100,13 @@ program qml_driver
 
     ! Allocate local work arrays
     call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work_query, -1, info)
-    lwork = work_query(1)
+    lwork = INT(work_query(1))
     allocate(work(lwork))
 
     ! copy data
     local_B = 0.0d0
     do local_i = 1, local_B_rows
-        call l2g(local_i, local_rank_row, na, ranks_rows, block_size, global_i)
+        call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
         local_B(local_i, 1) = y(global_i)
     enddo
 
@@ -116,7 +116,7 @@ program qml_driver
     ! Copy LAPACK output
     alphas = 0.0d0
     do local_i = 1, local_B_rows
-        call l2g(local_i, local_rank_row, na, ranks_rows, block_size, global_i)
+        call l2g(local_i, local_rank_row, ranks_rows, block_size, global_i)
         alphas(global_i) = local_B(local_i, 1)
     enddo
     call DGSUM2D(context, "All", "1-tree", na, 1, alphas, 1, -1, -1)
@@ -142,12 +142,11 @@ program qml_driver
 end program qml_driver
 ! convert local index to global index in block-cyclic distribution
 
-   subroutine l2g(il,p,n,np,nb,i)
+   subroutine l2g(il,p,np,nb,i)
 
    implicit none
    integer :: il   ! local array index, input
    integer :: p    ! processor array index, input
-   integer :: n    ! global array dimension, input
    integer :: np   ! processor array dimension, input
    integer :: nb   ! block size, input
    integer :: i    ! global array index, output
