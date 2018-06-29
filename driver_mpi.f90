@@ -95,8 +95,8 @@ program qml_driver
     enddo
 
     ! Setup variables for LAPACK
-    call descinit(desca, na, na, block_size, block_size, 0, 0, context, local_K_rows, info)
-    call descinit(descb, na, 1, block_size, block_size, 0, 0, context, local_B_rows, info)
+    call descinit(desca, na, na, block_size, block_size, 0, 0, context, MAX(1, local_K_rows), info)
+    call descinit(descb, na, 1, block_size, block_size, 0, 0, context, MAX(1, local_B_rows), info)
 
     ! Allocate local work arrays
     call pdgels("N", na, na, 1, local_K, 1, 1, desca, local_B, 1, 1, DESCB, work_query, -1, info)
